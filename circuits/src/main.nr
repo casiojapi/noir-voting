@@ -1,25 +1,49 @@
 use dep::std;
 
-fn main(comms_list: pub [Field; 4 ], index: Field, secret: Field) {
-    let commitment = std::hash::pedersen([secret])[0];
-    assert(comms_list[index] == commitment);
+fn main(root : pub Field, index : Field, hash_path : [Field; 2], secret: Field, proposal_id: pub Field) -> pub Field {
+    // note commitment 
+    let note_commitment = std::hash::pedersen_commitment([secret]);
+
+    // build nullifier
+    let nullifier = std::hash::pedersen_commitment([root, secret, proposalId]);
+
+    // check root
+    let check_root = std::merkle::compute_merkle_root(note_commitment[0], index, hash_path);
+    assert(root == check_root);
+
+    // send nullifier
+    nullifier[0]
 }
 
+
 #[test]
-fn main_test() {
-    let comm_1 = std::hash::pedersen([1])[0];
-    let comm_2 = std::hash::pedersen([2])[0];
-    let comm_3 = std::hash::pedersen([3])[0];
-    let comm_4 = std::hash::pedersen([4])[0];
+fn test_valid_build_merkle_tree() {
+    // build merkle
+    let commitment_0 = std::hash::pedersen_commitment([1])[0];
+    let commitment_1 = std::hash::pedersen_commitment([2])[0];
+    let commitment_2 = std::hash::pedersen_commitment([3])[0];
+    let commitment_3 = std::hash::pedersen_commitment([4])[0];
 
-    let commitments_list = [comm_1, comm_2, comm_3, comm_4]; 
+    // left 
+    let left_branch = std::hash::pedersen_commitment([commitment_0, commitment_1])[0];
 
-    for i in 0..4 {
-        std::println(commitments_list[i]);
-    }
-    // For User 1
-    main(commitments_list, 0, 1);
+    // right 
+    let right_branch = std::hash::pedersen_commitment([commitment_2, commitment_3])[0];
+    
+    // root-hash
+    let root = std::hash::pedersen_commitment([left_branch, right_branch])[0];
 
-    // For User 2
-    main(commitments_list, 1, 2);
+    let proposal_id = 0;
+    
+    let nullifier = main(
+      root,
+      0,
+      [commitment_1, right_branch],
+      1,
+      proposal_id
+    );
+
+    let expected_nullifier = std::hash::pedersen([root, 1, proposal_id]);
+
+    assert(nullifier == expected_nullifier[0]);
 }
